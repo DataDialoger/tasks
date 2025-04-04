@@ -8,15 +8,24 @@ class QueryGPT:
     to generate appropriate SQL.
     """
     
-    def __init__(self, schema: Optional[Dict[str, List[Dict[str, Any]]]] = None):
+    def __init__(self, schema: Optional[Dict[str, List[Dict[str, Any]]]] = None, 
+                 db_config: Optional[Dict[str, str]] = None):
         """
         Initialize the QueryGPT agent.
         
         Args:
             schema: Database schema information. If None, the agent will 
                 request schema information when needed.
+            db_config: Dictionary containing database connection parameters:
+                - host: Database host
+                - port: Database port
+                - user: Database username
+                - password: Database password
+                - database: Database name
         """
         self.schema = schema
+        self.db_config = db_config
+        self.connection = None
         self.table_descriptions = {}
         self.metadata = {}
         self.recently_used_tables = []
@@ -52,15 +61,22 @@ class QueryGPT:
             
         Returns:
             Dict containing the SQL query, explanation, and reasoning
+            
+        Raises:
+            ValueError: If schema is not provided or invalid
+            ConnectionError: If database connection fails
         """
-        # Check if we have schema information
-        if not self.schema:
-            return {
-                "sql": None,
-                "safe": True,
-                "explanation": "I need database schema information to generate SQL queries.",
-                "reasoning": "Without knowing the database structure (tables and columns), I cannot generate an accurate SQL query."
-            }
+        # Validate schema
+        if not self.schema or not isinstance(self.schema, dict):
+            raise ValueError("Valid schema information is required")
+            
+        # Validate database connection
+        if self.db_config:
+            try:
+                import psycopg2
+                self.connection = psycopg2.connect(**self.db_config)
+            except Exception as e:
+                raise ConnectionError(f"Failed to connect to database: {str(e)}")
         
         # Check if the query might be unsafe
         if self._is_unsafe_query(user_question):
@@ -494,18 +510,21 @@ class QueryGPT:
                 # Special handling for date/time conditions
                 if col["data_type"] in ["timestamp", "date", "datetime"]:
                     if "after" in query_text or "since" in query_text:
+                        # Get current date/time for dynamic comparison
+                        from datetime import datetime
+                        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                         where_conditions.append({
                             "table": table_name,
                             "column": col["column"],
                             "operator": ">",
-                            "value": "2023"  # Simplified for demo
+                            "value": current_time
                         })
                     elif "before" in query_text:
                         where_conditions.append({
                             "table": table_name,
                             "column": col["column"],
                             "operator": "<",
-                            "value": "2023"  # Simplified for demo
+                            "value": current_time
                         })
                 
                 # Check for equality conditions
@@ -914,25 +933,63 @@ sample_metadata = {
     }
 }
 
-# Example usage
-if __name__ == "__main__":
+def execute_query(conn, sql):
+    """Execute SQL query and return results"""
+    try:
+        cursor = conn.cursor()
+        cursor.execute(sql)
+        columns = [desc[0] for desc in cursor.description]
+        results = cursor.fetchall()
+        return columns, results
+    except Exception as e:
+        print(f"Error executing query: {e}")
+        return None, None
 
-    questions = [
-        "How many users do we have?",
-        "What are the top 5 most expensive products?",
-        "Show me all orders placed by user with email john@example.com",
-        "What's the average order value per user?",
-        "Which product categories have more than 10 items in stock?"
-    ]
+def interactive_cli():
+    """Run interactive command-line interface"""
+    import argparse
     
-    # Initialize with sample schema and metadata
-    for question in questions:
-        print(f"\nQuestion: {question}")
-        result = generate_sql(
-            user_question=question,
-            schema=sample_schema,
-            metadata=sample_metadata
-        )
-        print(f"SQL: {result['sql']}")
-        print(f"Explanation: {result['explanation']}")
-        print("-" * 80)
+    parser = argparse.ArgumentParser(description='Natural Language to SQL Query Generator')
+    parser.add_argument('--db-config', type=str, help='Path to database config JSON file')
+    args = parser.parse_args()
+
+    # Load database config if provided
+    db_config = None
+    if args.db_config:
+        import json
+        with open(args.db_config) as f:
+            db_config = json.load(f)
+
+    # Initialize with sample schema/metadata or real database
+    agent = QueryGPT(schema=sample_schema, db_config=db_config)
+    agent.set_metadata(sample_metadata)
+
+    print("Natural Language to SQL Query Generator")
+    print("Type your question or 'exit' to quit\n")
+    
+    while True:
+        try:
+            question = input("> ")
+            if question.lower() in ('exit', 'quit'):
+                break
+                
+            result = agent.process_query(question)
+            print(f"\nSQL: {result['sql']}")
+            print(f"\nExplanation: {result['explanation']}")
+            
+            if agent.connection and result['sql']:
+                columns, results = execute_query(agent.connection, result['sql'])
+                if columns:
+                    print("\nResults:")
+                    print("\t".join(columns))
+                    for row in results:
+                        print("\t".join(str(x) for x in row))
+            
+            print("\n" + "-"*80 + "\n")
+            
+        except Exception as e:
+            print(f"Error: {e}")
+            continue
+
+if __name__ == "__main__":
+    interactive_cli()
