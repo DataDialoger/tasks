@@ -1,7 +1,9 @@
 import re
 from typing import Dict, List, Optional, Union, Any
 
-class QueryGPT:
+
+#for the product related quert ANALYSIS
+class QuerySQL:
     """
     An agent that converts natural language questions to SQL queries.
     Similar to Uber's QueryGPT, this agent analyzes the question and database schema
@@ -126,12 +128,12 @@ class QueryGPT:
             r"drop\s+(?:all|the)",
         ]
         
-        # Check for keywords that directly suggest data modification
+       
         for keyword in unsafe_keywords:
             if keyword in query_lower.split():
                 return True
+
         
-        # Check for patterns that might suggest data modification
         for pattern in unsafe_patterns:
             if re.search(pattern, query_lower):
                 return True
@@ -150,10 +152,10 @@ class QueryGPT:
         """
         query_lower = query.lower()
         
-        # Determine the query intent
+
         intent = "SELECT"  # Default intent is retrieval
         
-        # Check for specific query intents
+       
         if any(term in query_lower for term in ["count", "how many", "number of"]):
             intent = "COUNT"
         elif any(term in query_lower for term in ["average", "avg", "mean"]):
@@ -730,7 +732,7 @@ def generate_sql(user_question: str, schema: Dict = None, metadata: Dict = None)
         "reasoning": result["reasoning"]
     }
 
-# Example schema for demonstration
+# Example schema for demonstration that is how it should work 
 sample_schema = {
     "users": [
         {"name": "id", "data_type": "integer", "description": "User ID"},
@@ -756,7 +758,7 @@ sample_schema = {
     ]
 }
 
-# Example metadata with relationships
+# Example metadata with relationships to test
 sample_metadata = {
     "relationships": {
         "users_orders": {
@@ -774,7 +776,7 @@ sample_metadata = {
 
 
 if __name__ == "__main__":
-    # Sample questions
+    # Sample questions to test 
     questions = [
         "How many users do we have?",
         "What are the top 5 most expensive products?",
