@@ -1,6 +1,7 @@
 import sqlite3
 import os
 
+#function to connect to sql database 
 def connect_to_sqlite_db(db_path):
     """Connect to a SQLite database at the given path."""
     if not os.path.exists(db_path):
@@ -29,7 +30,7 @@ def main():
     """Main function to run the SQLite agent."""
     print("SQLite Database Agent")
     
-    # Ask for database path
+    # Ask database path from the user 
     db_path = input("Enter the path to your SQLite database: ")
     
     # Connect to the database
@@ -48,12 +49,12 @@ def main():
         connection.close()
         return
     
-    # Display tables
+    # Display tables 
     print("\nAvailable tables:")
     for i, table in enumerate(tables, 1):
         print(f"{i}. {table}")
     
-    # Ask user to select a table
+    #  select a table according to the user 
     while True:
         try:
             selection = input("\nSelect a table (enter the number): ")
@@ -68,7 +69,7 @@ def main():
         except ValueError:
             print("Please enter a valid number.")
     
-    # Close the connection
+    # Close the connection if any 
     connection.close()
     print("Connection closed.")
 
