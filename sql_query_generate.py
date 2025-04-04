@@ -2,7 +2,7 @@ import re
 from typing import Dict, List, Optional, Union, Any
 
 
-#for the product related quert ANALYSIS
+#for the product related ANALYSIS
 class QuerySQL:
     """
     An agent that converts natural language questions to SQL queries.
